@@ -210,7 +210,7 @@ public class InitializeRewriter implements Function<Module, Rewriter> {
             List<org.kframework.backend.java.kil.Rule> javaRules = processProofRules.getJavaRules();
             KOREtoBackendKIL converter = processProofRules.getConverter();
             TermContext termContext = processProofRules.getTermContext();
-            List<org.kframework.backend.java.kil.Rule> allRules = javaRules.stream()
+            List<org.kframework.backend.java.kil.Rule> specRules = javaRules.stream()
                     .map(org.kframework.backend.java.kil.Rule::renameVariables)
                     .collect(Collectors.toList());
 
@@ -233,7 +233,7 @@ public class InitializeRewriter implements Function<Module, Rewriter> {
                         if (rewritingContext.javaExecutionOptions.cacheFunctionsOptimized) {
                             rewritingContext.functionCache.clearCache();
                         }
-                        return rewriter.proveRule(r, lhs, rhs, allRules, kem);
+                        return rewriter.proveRule(r, lhs, rhs, specRules, kem);
                     })
                     .flatMap(List::stream)
                     .collect(Collectors.toList());
