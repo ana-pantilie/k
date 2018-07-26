@@ -89,4 +89,11 @@ public final class GlobalOptions {
 
     @Parameter(names={"--warnings-to-errors", "-w2e"}, description="Convert warnings to errors.")
     public boolean warnings2errors = false;
+
+    @Parameter(names="--cache-func", description="Cache evaluation results of pure functions.")
+    public boolean cacheFunctions = false;
+
+    @Parameter(names="--cache-func-optimized",
+            description="Clear function cache after initialization phase. Frees some memory. Use IN ADDITION to --cache-func")
+    public boolean cacheFunctionsOptimized = false;
 }
