@@ -290,10 +290,19 @@ public class KItem extends Term implements KItemRepresentation {
                     result = global.kItemOps.evaluateFunction(this, context);
                     result.cachePut(constraint, result, context);
                     this.cachePut(constraint, result, context);
-                    global.profiler.countResFuncTopUncached++;
+                    if (global.profiler.resFuncNanoTimer.getLevel() == 1) {
+                        global.profiler.countResFuncTopUncached++;
+                    } else {
+                        global.profiler.countResFuncRecursiveUncached++;
+                    }
                 }
             } else {
                 result = global.kItemOps.evaluateFunction(this, context);
+                if (global.profiler.resFuncNanoTimer.getLevel() == 1) {
+                    global.profiler.countResFuncTopUncached++;
+                } else {
+                    global.profiler.countResFuncRecursiveUncached++;
+                }
             }
         } finally {
             global.profiler.resFuncNanoTimer.stop();
@@ -320,6 +329,11 @@ public class KItem extends Term implements KItemRepresentation {
                 }
             } else {
                 result = global.kItemOps.resolveFunctionAndAnywhere(this, context);
+                if (global.profiler.resFuncNanoTimer.getLevel() == 1) {
+                    global.profiler.countResFuncTopUncached++;
+                } else {
+                    global.profiler.countResFuncRecursiveUncached++;
+                }
             }
         } finally {
             global.profiler.resFuncNanoTimer.stop();
