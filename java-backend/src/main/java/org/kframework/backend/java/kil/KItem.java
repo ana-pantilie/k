@@ -580,7 +580,7 @@ public class KItem extends Term implements KItemRepresentation {
                             }
 
                             if (kItem.global.globalOptions.logRulesPublic && result != null) {
-                                System.err.println("\n" + rule);
+                                RuleSourceUtil.printRuleAndSource(rule);
                             }
 
                             /*
@@ -702,7 +702,7 @@ public class KItem extends Term implements KItemRepresentation {
                 rightHandSide = rightHandSide.substituteAndEvaluate(solution, context);
 
                 if (global.globalOptions.logRulesPublic) {
-                    System.err.println("\n" + rule);
+                    RuleSourceUtil.printRuleAndSource(rule);
                 }
                 return rightHandSide;
             } finally {
