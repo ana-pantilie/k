@@ -170,6 +170,10 @@ public abstract class JavaSymbolicObject<T extends JavaSymbolicObject<T>>
     ConjunctiveFormula getCacheConstraint(TermContext context) {
         return isGround() ? null : context.getTopConstraint();
     }
+    
+    public boolean isVariable() {
+        return this instanceof Variable;
+    }
 
      /**
      * Returns true if the function and anywhere symbols in this
