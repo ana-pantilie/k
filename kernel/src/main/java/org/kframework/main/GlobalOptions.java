@@ -148,5 +148,10 @@ public final class GlobalOptions {
             description="Log actual z3 queries. Activates --debug-z3 automatically.")
     public boolean debugZ3Queries = false;
 
+    @Parameter(names="--cache-tostring",
+            description="Cache toString() result for KItem, Equality and DisjunctiveFormula. " +
+                    "Speeds up logging but eats more memory.", arity = 1)
+    public boolean cacheToString = true;
+
     public boolean logRulesPublic = false;
 }
