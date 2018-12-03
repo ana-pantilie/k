@@ -17,7 +17,6 @@ import org.kframework.backend.java.kil.CollectionInternalRepresentation;
 import org.kframework.backend.java.kil.ConstrainedTerm;
 import org.kframework.backend.java.kil.DataStructures;
 import org.kframework.backend.java.kil.GlobalContext;
-import org.kframework.backend.java.kil.HasGlobalContext;
 import org.kframework.backend.java.kil.JavaSymbolicObject;
 import org.kframework.backend.java.kil.KItem;
 import org.kframework.backend.java.kil.KLabel;
@@ -549,9 +548,10 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
             PersistentUniqueList<Equality> equalities,
             PersistentUniqueList<DisjunctiveFormula> disjunctions,
             Equality equality) {
-        if (RuleAuditing.isAuditBegun() || global.globalOptions.logBasic) {
-            System.err.println("Unification failure: " + equality.leftHandSide()
-                    + " does not unify with " + equality.rightHandSide());
+        if ((RuleAuditing.isAuditBegun() || global.globalOptions.logBasic)
+                && !(equality.leftHandSide() instanceof BoolToken && equality.rightHandSide() instanceof BoolToken)) {
+            System.err.format("Unification failure: %s does not unify with %s\n",
+                    equality.leftHandSide(), equality.rightHandSide());
         }
         return new ConjunctiveFormula(
                 substitution,
@@ -843,12 +843,16 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
         return implies(constraint, Collections.emptySet(), new FormulaContext(FormulaContext.Kind.EquivImplication, null));
     }
 
-    public boolean implies(ConjunctiveFormula constraint, Set<Variable> rightOnlyVariables, FormulaContext formulaContext) {
+    /**
+     * Checks if {@code this} implies {@code rightHandSide}, assuming that {@code existentialQuantVars}
+     * are existentially quantified.
+     */
+    public boolean implies(ConjunctiveFormula rightHandSide, Set<Variable> existentialQuantVars, FormulaContext formulaContext) {
         // TODO(AndreiS): this can prove "stuff -> false", it needs fixing
-        assert !constraint.isFalseExtended();
+        assert !rightHandSide.isFalseExtended();
 
         LinkedList<Pair<ConjunctiveFormula, ConjunctiveFormula>> implications = new LinkedList<>();
-        implications.add(Pair.of(this, constraint));
+        implications.add(Pair.of(this, rightHandSide));
         while (!implications.isEmpty()) {
             Pair<ConjunctiveFormula, ConjunctiveFormula> implication = implications.remove();
             ConjunctiveFormula left = implication.getLeft();
@@ -861,10 +865,10 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
                 System.err.format("\nAttempting to prove:\n================= \n\t%s\n  implies \n\t%s\n", left, right);
             }
 
-            right = right.orientSubstitution(rightOnlyVariables);
+            right = right.orientSubstitution(existentialQuantVars);
             right = left.simplifyConstraint(right);
-            right = right.orientSubstitution(rightOnlyVariables);
-            if (right.isTrue() || (right.equalities().isEmpty() && rightOnlyVariables.containsAll(right.substitution().keySet()))) {
+            right = right.orientSubstitution(existentialQuantVars);
+            if (right.isTrue() || (right.equalities().isEmpty() && existentialQuantVars.containsAll(right.substitution().keySet()))) {
                 if (global.globalOptions.debug) {
                     System.err.println("Implication proved by simplification");
                 }
@@ -886,7 +890,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
                 continue;
             }
 
-            if (!impliesSMT(left, right, rightOnlyVariables, formulaContext)) {
+            if (!impliesSMT(left, right, existentialQuantVars, formulaContext)) {
                 if (global.globalOptions.debug) {
                     System.err.println("Failure!");
                 }
@@ -942,19 +946,23 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
 
     public static CounterStopwatch impliesStopwatch = new CounterStopwatch("impliesSMT");
 
+    /**
+     * Checks if {@code left} implies {@code right}, assuming that {@code existentialQuantVars}
+     * are existentially quantified.
+     */
     private static boolean impliesSMT(
             ConjunctiveFormula left,
             ConjunctiveFormula right,
-            Set<Variable> rightOnlyVariables,
+            Set<Variable> existentialQuantVars,
             FormulaContext formulaContext) {
         impliesStopwatch.start();
         formulaContext.z3Profiler.newRequest();
         try {
-            Triple<ConjunctiveFormula, ConjunctiveFormula, Set<Variable>> triple = Triple.of(left, right, rightOnlyVariables);
+            Triple<ConjunctiveFormula, ConjunctiveFormula, Set<Variable>> triple = Triple.of(left, right, existentialQuantVars);
             boolean cached = true;
             if (!impliesSMTCache.containsKey(triple)) {
                 impliesSMTCache.put(triple,
-                        left.global.constraintOps.impliesSMT(left, right, rightOnlyVariables, formulaContext));
+                        left.global.constraintOps.impliesSMT(left, right, existentialQuantVars, formulaContext));
                 cached = false;
             }
             Boolean result = impliesSMTCache.get(triple);

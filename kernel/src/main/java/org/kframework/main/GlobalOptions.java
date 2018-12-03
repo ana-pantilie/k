@@ -162,5 +162,19 @@ public final class GlobalOptions {
                     "Speeds up logging but eats more memory.", arity = 1)
     public boolean cacheToString = true;
 
+    @Parameter(names = "--log-memory-after-gc",
+            description = "In the summary box, in addition to printing regular used memory, " +
+                    "also print used memory after System.gc(). Gives more precise information about memory usage.")
+    public boolean logMemoryAfterGC = false;
+
+    @Parameter(names = "--log-success", description = "Log success final states. " +
+            "By default only failure final states are logged.")
+    public boolean logSuccessFinalStates = false;
+
+    @Parameter(names = "--halt-local-mem-non-map", description = "KEVM-specific. Halt when <localMem> cell at the end " +
+            "of a step is not a map. useful debug option when memory model is a K builtin map. " +
+            "Otherwise option should be false.")
+    public boolean haltOnLocalMemNonMap = false;
+
     public boolean logRulesPublic = false;
 }

@@ -74,11 +74,12 @@ public class SMTOperations {
 
     /**
      * Checks if {@code left => right}, or {@code left /\ !right} is unsat.
+     * Assuming that {@code existentialQuantVars} are existentially quantified.
      */
     public boolean impliesSMT(
             ConjunctiveFormula left,
             ConjunctiveFormula right,
-            Set<Variable> rightOnlyVariables, FormulaContext formulaContext) {
+            Set<Variable> existentialQuantVars, FormulaContext formulaContext) {
         if (smtOptions.smt == SMTSolver.Z3) {
             try {
                 //From this point on, will be converted to toString() anyway.
@@ -88,7 +89,7 @@ public class SMTOperations {
                     System.err.println("\nAnonymous vars in query:");
                 }
                 try {
-                    query = KILtoSMTLib.translateImplication(left, right, rightOnlyVariables).toString();
+                    query = KILtoSMTLib.translateImplication(left, right, existentialQuantVars).toString();
                 } finally {
                     left.globalContext().profiler.queryBuildTimer.stop();
                 }

@@ -27,6 +27,7 @@ import org.kframework.backend.java.kil.TermContext;
 import org.kframework.backend.java.kil.Variable;
 import org.kframework.backend.java.strategies.TransitionCompositeStrategy;
 import org.kframework.backend.java.util.FormulaContext;
+import org.kframework.backend.java.util.Profiler2;
 import org.kframework.backend.java.util.RuleSourceUtil;
 import org.kframework.backend.java.utils.BitSet;
 import org.kframework.builtin.KLabels;
@@ -100,7 +101,7 @@ public class SymbolicRewriter {
 
         stopwatch.stop();
         if (global.globalOptions.verbose) {
-            printSummaryBox(null, null, 1, step);
+            printSummaryBox(null, null, 1, step, 0);
         }
         return new RewriterResult(Optional.of(step), afterVariableRename.term());
     }
@@ -241,7 +242,7 @@ public class SymbolicRewriter {
             }
 
             if (global.globalOptions.debugZ3 && !result.constraint().equals(subject.constraint())) {
-                System.err.format("New top constraint created: \n%s\n", subject.constraint().toStringMultiline());
+                System.err.format("New top constraint created: \n%s\n", result.constraint().toStringMultiline());
             }
             results.add(result);
         }
@@ -606,6 +607,7 @@ public class SymbolicRewriter {
             ConstrainedTerm targetTerm,
             List<Rule> specRules, KExceptionManager kem) {
         List<ConstrainedTerm> proofResults = new ArrayList<>();
+        List<ConstrainedTerm> successResults = new ArrayList<>();
         int successPaths = 0;
         Set<ConstrainedTerm> visited = new HashSet<>();
         List<ConstrainedTerm> queue = new ArrayList<>();
@@ -668,6 +670,7 @@ public class SymbolicRewriter {
                             System.out.println("\n============\nStep " + step + ": eliminated!\n============\n");
                         }
                         successPaths++;
+                        successResults.add(term);
                         continue;
                     } else if (!initKEqualsTargetK) {
                         //Kprove customization: if <k> matches target <k>, further evaluation is probably useless. Halting.
@@ -803,12 +806,20 @@ public class SymbolicRewriter {
                 global.globalOptions.debugZ3 = oldDebug;
                 global.globalOptions.log = oldLog;
 
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new RuntimeException("Thread interrupted");
+                }
+                } catch (OutOfMemoryError e) {
+                    e.printStackTrace();
+                    printSummaryBox(rule, proofResults, successPaths, step, queue.size() + nextQueue.size() - v + 1);
+                    throw e;
                 } catch (RuntimeException | Error e) {
                     System.err.println("\n" +
                             "==========================================\n" +
                             "Top term when exception was thrown:\n" +
                             "==========================================\n");
                     printTermAndConstraint(term);
+                    printSummaryBox(rule, proofResults, successPaths, step, queue.size() + nextQueue.size() - v + 1);
                     throw e;
                 }
             }
@@ -831,8 +842,17 @@ public class SymbolicRewriter {
             System.out.println(KLabels.ML_TRUE);
         }
 
+        if (global.globalOptions.logSuccessFinalStates) {
+            System.err.println("\n" +
+                    "==========================================\n" +
+                    "Success final states:\n" +
+                    "==========================================\n");
+            for (ConstrainedTerm result : successResults) {
+                printTermAndConstraint(result);
+            }
+        }
         if (global.globalOptions.verbose) {
-            printSummaryBox(rule, proofResults, successPaths, step);
+            printSummaryBox(rule, proofResults, successPaths, step, 0);
         }
         return proofResults;
     }
@@ -854,8 +874,12 @@ public class SymbolicRewriter {
         }
     }
 
-    private void printSummaryBox(Rule rule, List<ConstrainedTerm> proofResults, int successPaths, int step) {
-        if (proofResults != null) {
+    private void printSummaryBox(Rule rule, List<ConstrainedTerm> proofResults, int successPaths, int step, int pathsInProgress) {
+        if (pathsInProgress != 0) {
+            System.err.format("\nSPEC ERROR: %s %s\n==================================\n" +
+                            "Success execution paths: %d\nFailed execution paths: %d\nPaths in progress: %d\n",
+                    new File(rule.getSource().source()), rule.getLocation(), successPaths, proofResults.size(), pathsInProgress);
+        } else if (proofResults != null) {
             if (proofResults.isEmpty()) {
                 System.err.format("\nSPEC PROVED: %s %s\n==================================\nExecution paths: %d\n",
                         new File(rule.getSource().source()), rule.getLocation(), successPaths);
@@ -906,7 +930,8 @@ public class SymbolicRewriter {
         KItem localMem = getCell(top, "<localMem>");
         K localMemMap = localMem != null ? localMem.klist().items().get(0) : null;
 
-        if (!(localMemMap instanceof BuiltinMap || localMemMap instanceof Variable)) {
+        if (global.globalOptions.haltOnLocalMemNonMap
+                && !(localMemMap instanceof BuiltinMap || localMemMap instanceof Variable)) {
             forced = true;
         }
 
@@ -916,8 +941,9 @@ public class SymbolicRewriter {
         boolean inNewStmt = global.globalOptions.logStmtsOnly && kSequence != null && inNewStmt(kSequence);
 
         if (global.globalOptions.log || forced || inNewStmt || global.globalOptions.logRulesPublic) {
-            System.out.format("\nSTEP %d v%d : %.3f s \n===================\n",
-                    step, v, (System.currentTimeMillis() - global.profiler.getStartTime()) / 1000.);
+            System.out.format("\nSTEP %d v%d : %.3f s, \t\t%d MB\n===================\n",
+                    step, v, (System.currentTimeMillis() - global.profiler.getStartTime()) / 1000.,
+                    Profiler2.usedMemory());
         }
 
         boolean actuallyLogged = global.globalOptions.log || forced || inNewStmt;
@@ -952,7 +978,8 @@ public class SymbolicRewriter {
             }
         }
         global.profiler.logOverheadTimer.stop();
-        if (localMem != null && !(localMemMap instanceof BuiltinMap || localMemMap instanceof Variable)) {
+        if (global.globalOptions.haltOnLocalMemNonMap
+                && localMem != null && !(localMemMap instanceof BuiltinMap || localMemMap instanceof Variable)) {
             throw new RuntimeException("<localMem> non-map format, aborting.");
         }
         return actuallyLogged;
@@ -980,7 +1007,7 @@ public class SymbolicRewriter {
     private void printAccounts(KItem accounts, boolean pretty) {
         BuiltinMap accountsMap = accounts != null ? (BuiltinMap) ((KList) accounts.klist()).get(0) : null;
         if (accountsMap != null) {
-            System.out.println("accounts: " + accountsMap.size());
+            System.out.println("accounts: " + accountsMap.getEntries().size());
             for (Map.Entry<Term, Term> acct : accountsMap.getEntries().entrySet()) {
                 Term acctID = acct.getKey();
                 KItem storage = getCell((KItem) acct.getValue(), "<storage>");
@@ -994,7 +1021,7 @@ public class SymbolicRewriter {
         K localMemMap = localMem != null ? localMem.klist().items().get(0) : null;
         System.out.println("<localMem>");
 
-        if (localMemMap instanceof BuiltinMap) {
+        if (!global.globalOptions.haltOnLocalMemNonMap || localMemMap instanceof BuiltinMap) {
             System.out.println("...");
         } else {
             System.out.println("\tNon-map format:");

@@ -162,6 +162,10 @@ public abstract class JavaSymbolicObject<T extends JavaSymbolicObject<T>>
         return isGround() && isNormal();
     }
 
+    public boolean isVariable() {
+        return this instanceof Variable;
+    }
+
     /**
      * Return the {@code context.getTopConstraint()} adapted to be used as cache key without functionality changes.
      * <p>
