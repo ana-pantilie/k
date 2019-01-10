@@ -94,7 +94,7 @@ public class PatternExpander extends CopyOnWriteTransformer {
                 // this should be guaranteed by the above unificationConstraint.isMatching
                 assert requires.substitution().keySet().containsAll(existVariables);
                 if (requires.isFalseExtended() || !constraint.implies(requires, existVariables,
-                        new FormulaContext(FormulaContext.Kind.PatternRule, rule))) {
+                        new FormulaContext(FormulaContext.Kind.PatternRule, rule), false)) {
                     continue;
                 }
             }

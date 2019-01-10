@@ -96,8 +96,9 @@ public class ConstrainedTerm extends JavaSymbolicObject {
         return data.constraint;
     }
 
-    public boolean implies(ConstrainedTerm constrainedTerm, Rule specRule, boolean logFailures) {
-        ConjunctiveFormula conjunctiveFormula = matchImplies(constrainedTerm, true, logFailures,
+
+    public boolean implies(ConstrainedTerm constrainedTerm, Rule specRule, boolean logFailures, boolean forceLog) {
+        ConjunctiveFormula conjunctiveFormula = matchImplies(constrainedTerm, true, logFailures, forceLog,
                 new FormulaContext(FormulaContext.Kind.FinalImplication, specRule), specRule.matchingSymbols());
         return conjunctiveFormula != null;
     }
@@ -130,7 +131,7 @@ public class ConstrainedTerm extends JavaSymbolicObject {
         ConjunctiveFormula constraint = ConjunctiveFormula.of(constrainedTerm.termContext().global())
                 .add(data.constraint.substitution())
                 .add(data.term, constrainedTerm.data.term)
-                .simplifyBeforePatternFolding(context, false);
+                .simplifyBeforePatternFolding(context, false, false);
         return !constraint.isFalseExtended();
     }
 
@@ -142,12 +143,12 @@ public class ConstrainedTerm extends JavaSymbolicObject {
      * @return If implication value is {@code true}, return the unification constraint:
      * implicationLHS /\ implicationRHS. Otherwise return {@code true}.
      */
-    public ConjunctiveFormula matchImplies(ConstrainedTerm matchRHSTerm, boolean expand, boolean logFailures,
+    public ConjunctiveFormula matchImplies(ConstrainedTerm matchRHSTerm, boolean expand, boolean logFailures, boolean forceLog,
                                            FormulaContext formulaContext, Set<String> matchingSymbols) {
         ConjunctiveFormula constraint = ConjunctiveFormula.of(matchRHSTerm.termContext().global())
                 .add(data.constraint.substitution())
                 .add(data.term, matchRHSTerm.data.term)
-                .simplifyBeforePatternFolding(context, logFailures);
+                .simplifyBeforePatternFolding(context, logFailures, forceLog);
         if (constraint.isFalseExtended()) {
             return null;
         }
@@ -211,7 +212,7 @@ public class ConstrainedTerm extends JavaSymbolicObject {
         ConjunctiveFormula implicationRHS = constraint.removeBindings(matchRHSOnlyVars);
         implicationRHS = (ConjunctiveFormula) implicationRHS.substituteAndEvaluate(implicationLHS.substitution(), context);
 
-        boolean implies = implicationLHS.implies(implicationRHS, matchRHSOnlyVars, formulaContext);
+        boolean implies = implicationLHS.implies(implicationRHS, matchRHSOnlyVars, formulaContext, forceLog);
         if (!implies) {
             return null;
         }
@@ -305,7 +306,7 @@ public class ConstrainedTerm extends JavaSymbolicObject {
             if (candidate.substitution().keySet().equals(variables)
                     && !candidate.isSubstitution()
                     && subjectConstraint.implies(ConjunctiveFormula.of(context.global())
-                    .addAll(candidateConstraint.equalities()), Sets.newHashSet(), formulaContext)) {
+                    .addAll(candidateConstraint.equalities()), Sets.newHashSet(), formulaContext, false)) {
                 solutions.add(Triple.of(
                         subjectConstraint
                                 .addAndSimplify(candidateConstraint.substitution(), context)

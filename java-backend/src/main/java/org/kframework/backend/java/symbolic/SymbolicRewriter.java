@@ -659,8 +659,9 @@ public class SymbolicRewriter {
                 boolean alreadyLogged = logStep(step, v, targetCallData, term,
                         step == 1 || haltCellsMatchTarget, false);
                 if (haltCellsMatchTarget) {
-                    if (term.implies(targetTerm, rule, step > 1)) {
+                    if (term.implies(targetTerm, rule, step > 1, false)) {
                         global.stateLog.log(StateLog.LogEvent.REACHPROVED, term.term(), term.constraint());
+
                         if (global.globalOptions.logBasic) {
                             logStep(step, v, targetCallData, term, true, alreadyLogged);
                             System.err.println("\n============\nStep " + step + ": eliminated!\n============\n");
@@ -1074,7 +1075,7 @@ public class SymbolicRewriter {
     private ConstrainedTerm applySpecRules(ConstrainedTerm constrainedTerm, List<Rule> specRules) {
         for (Rule specRule : specRules) {
             ConstrainedTerm pattern = specRule.createLhsPattern(constrainedTerm.termContext());
-            ConjunctiveFormula constraint = constrainedTerm.matchImplies(pattern, true, false,
+            ConjunctiveFormula constraint = constrainedTerm.matchImplies(pattern, true, false, false,
                     new FormulaContext(FormulaContext.Kind.SpecRule, specRule), specRule.matchingSymbols());
             if (constraint != null) {
                 ConstrainedTerm result = buildResult(specRule, constraint, null, true, constrainedTerm.termContext(),

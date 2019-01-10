@@ -72,7 +72,7 @@ public class FastRuleMatcher {
     private TermContext context;
 
     public static ConjunctiveFormula unify(Term term, Term otherTerm, TermContext context) {
-        return new FastRuleMatcher(context.global(), 1).unifyEquality(term, otherTerm, false, false, true, context, false);
+        return new FastRuleMatcher(context.global(), 1).unifyEquality(term, otherTerm, false, false, true, context, false, false);
     }
 
     public static List<Substitution<Variable, Term>> match(Term subject, Term pattern, TermContext context) {
@@ -104,7 +104,7 @@ public class FastRuleMatcher {
         ruleMask.stream().forEach(i -> constraints[i] = ConjunctiveFormula.of(context.global()));
         empty = BitSet.apply(ruleCount);
 
-        BitSet theMatchingRules = matchAndLog(subject.term(), pattern, ruleMask, List(), false);
+        BitSet theMatchingRules = matchAndLog(subject.term(), pattern, ruleMask, List(), false, false);
 
         List<RuleMatchResult> structuralResults = new ArrayList<>();
         List<RuleMatchResult> transitionResults = new ArrayList<>();
@@ -178,7 +178,7 @@ public class FastRuleMatcher {
     /**
      * Matches the subject against the pattern. The pattern does not contain any disjunctions.
      */
-    public ConjunctiveFormula unifyEquality(Term subject, Term pattern, boolean patternFold, boolean partialSimplification, boolean continuousSimplification, TermContext context, boolean logFailures) {
+    public ConjunctiveFormula unifyEquality(Term subject, Term pattern, boolean patternFold, boolean partialSimplification, boolean continuousSimplification, TermContext context, boolean logFailures, boolean forceLog) {
         this.patternFold = patternFold;
         this.partialSimplification = partialSimplification;
         this.continuousSimplification = continuousSimplification;
@@ -187,7 +187,7 @@ public class FastRuleMatcher {
         empty = BitSet.apply(ruleCount);
         BitSet one = BitSet.apply(1);
         one.makeOnes(1);
-        BitSet theMatchingRules = matchAndLog(subject, pattern, one, List(), logFailures);
+        BitSet theMatchingRules = matchAndLog(subject, pattern, one, List(), logFailures, forceLog);
         if (theMatchingRules.get(0)) {
             return constraints[0];
         } else {
@@ -203,7 +203,7 @@ public class FastRuleMatcher {
         empty = BitSet.apply(ruleCount);
         BitSet one = BitSet.apply(1);
         one.makeOnes(1);
-        BitSet theMatchingRules = matchAndLog(subject, pattern, one, List(), false);
+        BitSet theMatchingRules = matchAndLog(subject, pattern, one, List(), false, false);
         if (theMatchingRules.get(0)) {
             return constraints[0].getDisjunctiveNormalForm().conjunctions().stream()
                     .map(c -> c.simplify(context))
@@ -223,11 +223,11 @@ public class FastRuleMatcher {
      */
     private BitSet matchAndLog(Term subject, Term pattern, BitSet ruleMask,
                                scala.collection.immutable.List<Pair<Integer, Integer>> path,
-                               boolean logFailures) {
+                               boolean logFailures, boolean forceLog) {
         BitSet result = match(subject, pattern, ruleMask, path, logFailures);
 
         final long lengthThreshold = 10000;
-        if (logFailures && global.globalOptions.logBasic && result.isEmpty()) {
+        if (forceLog || logFailures && global.globalOptions.logBasic && result.isEmpty()) {
             String subjectStr = subject.toString();
             subjectStr = subjectStr.substring(0, (int) Math.min(subjectStr.length(), lengthThreshold));
             if (subjectStr.length() == lengthThreshold) {
@@ -297,7 +297,7 @@ public class FastRuleMatcher {
         if (pattern instanceof KItem && KLabels.KREWRITE.equals(((KItem) pattern).kLabel())) {
             KApply rw = (KApply) pattern;
             InnerRHSRewrite innerRHSRewrite = (InnerRHSRewrite) rw.klist().items().get(1);
-            BitSet theNewMask = matchAndLog(subject, (Term) rw.klist().items().get(0), ruleMask, path, logFailures);
+            BitSet theNewMask = matchAndLog(subject, (Term) rw.klist().items().get(0), ruleMask, path, logFailures, false);
 
             for (int i = theNewMask.nextSetBit(0); i >= 0; i = theNewMask.nextSetBit(i + 1)) {
                 if (innerRHSRewrite.theRHS[i] != null) {
@@ -341,7 +341,7 @@ public class FastRuleMatcher {
                     continue;
                 }
 
-                ruleMask = matchAndLog(subjectKList.get(i), patternKList.get(i), ruleMask, path.$colon$colon(Pair.of(i, i + 1)), logFailures);
+                ruleMask = matchAndLog(subjectKList.get(i), patternKList.get(i), ruleMask, path.$colon$colon(Pair.of(i, i + 1)), logFailures, false);
                 if (ruleMask.isEmpty()) {
                     return ruleMask;
                 }
@@ -393,7 +393,7 @@ public class FastRuleMatcher {
             if (ruleMask.intersects(pSeq.getRight())) {
                 BitSet localRuleMaskSeq = ((BitSet) ruleMask.clone());
                 localRuleMaskSeq.and(pSeq.getRight());
-                localRuleMaskSeq = matchAndLog(subject, pSeq.getLeft(), localRuleMaskSeq, path, logFailures);
+                localRuleMaskSeq = matchAndLog(subject, pSeq.getLeft(), localRuleMaskSeq, path, logFailures, false);
                 returnSet.or(localRuleMaskSeq);
             }
         }
@@ -443,7 +443,7 @@ public class FastRuleMatcher {
                 elementMask = patternElementTailSplit.elementMask.clone();
                 elementMask.and(ruleMask);
                 if (!elementMask.isEmpty()) {
-                    elementMask = matchAndLog(subject.get(subjectIndex), patternElementTailSplit.element, elementMask, subject instanceof BuiltinList.SingletonBuiltinList ? path : path.$colon$colon(Pair.of(subjectIndex, subjectIndex + 1)), logFailures);
+                    elementMask = matchAndLog(subject.get(subjectIndex), patternElementTailSplit.element, elementMask, subject instanceof BuiltinList.SingletonBuiltinList ? path : path.$colon$colon(Pair.of(subjectIndex, subjectIndex + 1)), logFailures, false);
                     if (!elementMask.isEmpty()) {
                         elementMask = matchAssoc(subject, subjectIndex + 1, pattern, patternIndex + 1, elementMask, path, logFailures);
                     }
@@ -453,7 +453,7 @@ public class FastRuleMatcher {
             BitSet tailMask = patternElementTailSplit.tailMask.clone();
             tailMask.and(ruleMask);
             if (!tailMask.isEmpty()) {
-                tailMask = matchAndLog(subject.range(subjectIndex, subject.size()), patternElementTailSplit.tail, tailMask, path.$colon$colon(Pair.of(subjectIndex, subject.size())), logFailures);
+                tailMask = matchAndLog(subject.range(subjectIndex, subject.size()), patternElementTailSplit.tail, tailMask, path.$colon$colon(Pair.of(subjectIndex, subject.size())), logFailures, false);
             }
 
             BitSet resultSet = elementMask.clone();
@@ -481,7 +481,7 @@ public class FastRuleMatcher {
             this can only happen when the pattern contains a rewrite with a list pattern in the LHS,
             which means there are no deep-nested rewrites,
             which in turn means the inaccurate paths will never be used */
-            ruleMask = matchAndLog(subject.range(subjectIndex, i), pattern.get(patternIndex), ruleMask, subject instanceof BuiltinList.SingletonBuiltinList ? path : path.$colon$colon(Pair.of(subjectIndex, i)), logFailures);
+            ruleMask = matchAndLog(subject.range(subjectIndex, i), pattern.get(patternIndex), ruleMask, subject instanceof BuiltinList.SingletonBuiltinList ? path : path.$colon$colon(Pair.of(subjectIndex, i)), logFailures, false);
 
             if (!ruleMask.isEmpty()) {
                 ruleMask = matchAssoc(subject, i, pattern, patternIndex + 1, ruleMask, path, logFailures);
@@ -680,7 +680,7 @@ public class FastRuleMatcher {
         Map<Term, Term> remainingEntries = new HashMap<>();
         Map<Term, Term> otherRemainingEntries = new HashMap<>();
         for (Term key : commonKeys) {
-            ruleMask = matchAndLog(entries.get(key), otherEntries.get(key), ruleMask, path, logFailures);
+            ruleMask = matchAndLog(entries.get(key), otherEntries.get(key), ruleMask, path, logFailures, false);
             if (ruleMask.isEmpty()) {
                 return ruleMask;
             }
@@ -709,7 +709,7 @@ public class FastRuleMatcher {
                     List<Term> patternOutput = pattern.getPatternOutput();
                     List<Term> otherPatternOutput = otherPattern.getPatternOutput();
                     for (int i = 0; i < patternOutput.size(); ++i) {
-                        matchAndLog(patternOutput.get(i), otherPatternOutput.get(i), ruleMask, path, logFailures);
+                        matchAndLog(patternOutput.get(i), otherPatternOutput.get(i), ruleMask, path, logFailures, false);
                     }
                     unifiedPatterns.add(pattern);
                     otherUnifiedPatterns.add(otherPattern);

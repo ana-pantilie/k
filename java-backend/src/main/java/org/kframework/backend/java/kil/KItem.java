@@ -829,7 +829,7 @@ public class KItem extends Term implements KItemRepresentation {
 
     public String toStringImpl() {
         String label = kLabel.toString();
-        if(label.equals("<programBytes>") || label.equals("<code>")) {
+        if(label.equals("<programBytes>") || label.equals("<code>") || label.equals("<program>")) {
             return kLabel + "(" + ((KList)kList).getContents().size() + ")";
         } else if (label.equals("#mkCall__________EVM")) {
             return kLabel + "()";

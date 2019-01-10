@@ -372,7 +372,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
 
 
     public ConjunctiveFormula simplify() {
-        return simplify(false, true, TermContext.builder(global).build(), false);
+        return simplify(false, true, TermContext.builder(global).build(), false, false);
     }
 
     /**
@@ -380,7 +380,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
      * Decomposes equalities by using unification.
      */
     public ConjunctiveFormula simplify(TermContext context) {
-        return simplify(false, true, context, false);
+        return simplify(false, true, context, false, false);
     }
 
     /**
@@ -388,23 +388,23 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
      * between builtin data structures will remain intact if they cannot be
      * resolved completely.
      */
-    public ConjunctiveFormula simplifyBeforePatternFolding(TermContext context, boolean logFailures) {
-        return simplify(false, false, context, logFailures);
+    public ConjunctiveFormula simplifyBeforePatternFolding(TermContext context, boolean logFailures, boolean forceLog) {
+        return simplify(false, false, context, logFailures, forceLog);
     }
 
     public ConjunctiveFormula simplifyModuloPatternFolding(TermContext context) {
-        return simplify(true, true, context, false);
+        return simplify(true, true, context, false, false);
     }
 
     private ConjunctiveFormula simplify(boolean patternFolding, boolean partialSimplification,
-                                        TermContext context, boolean logFailures) {
+                                        TermContext context, boolean logFailures, boolean forceLog) {
         ConjunctiveFormula cachedResult = global.formulaCache
                 .cacheGet(this, patternFolding, partialSimplification, context);
         if (cachedResult != null) {
             return cachedResult;
         }
 
-        ConjunctiveFormula result = simplifyImpl(patternFolding, partialSimplification, context, logFailures);
+        ConjunctiveFormula result = simplifyImpl(patternFolding, partialSimplification, context, logFailures, forceLog);
         global.formulaCache.cachePut(this, patternFolding, partialSimplification, context, result);
         return result;
     }
@@ -414,7 +414,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
      * Decomposes equalities by using unification.
      */
     private ConjunctiveFormula simplifyImpl(boolean patternFolding, boolean partialSimplification, TermContext context,
-                                            boolean logFailures) {
+                                            boolean logFailures, boolean forceLog) {
         assert !isFalse();
         ConjunctiveFormula originalTopConstraint = context.getTopConstraint();
         Substitution<Variable, Term> substitution = this.substitution;
@@ -445,7 +445,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
                         if (equality.isSimplifiableByCurrentAlgorithm()) {
                             // (decompose + conflict)*
                             FastRuleMatcher unifier = new FastRuleMatcher(global, 1);
-                            ConjunctiveFormula unificationConstraint = unifier.unifyEquality(leftHandSide, rightHandSide, patternFolding, partialSimplification, false, context, logFailures);
+                            ConjunctiveFormula unificationConstraint = unifier.unifyEquality(leftHandSide, rightHandSide, patternFolding, partialSimplification, false, context, logFailures, forceLog);
                             if (unificationConstraint.isFalse()) {
                                 return falsify(
                                         substitution,
@@ -846,14 +846,14 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
          */
 
         constraint = (ConjunctiveFormula) constraint.substitute(this.substitution());
-        return implies(constraint, Collections.emptySet(), new FormulaContext(FormulaContext.Kind.EquivImplication, null));
+        return implies(constraint, Collections.emptySet(), new FormulaContext(FormulaContext.Kind.EquivImplication, null), false);
     }
 
     /**
      * Checks if {@code this} implies {@code rightHandSide}, assuming that {@code existentialQuantVars}
      * are existentially quantified.
      */
-    public boolean implies(ConjunctiveFormula rightHandSide, Set<Variable> existentialQuantVars, FormulaContext formulaContext) {
+    public boolean implies(ConjunctiveFormula rightHandSide, Set<Variable> existentialQuantVars, FormulaContext formulaContext, boolean forceLog) {
         // TODO(AndreiS): this can prove "stuff -> false", it needs fixing
         assert !rightHandSide.isFalse();
 
@@ -867,7 +867,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
                 continue;
             }
 
-            if (global.globalOptions.debug) {
+            if (forceLog || global.globalOptions.debug) {
                 System.err.format("\nAttempting to prove:\n================= \n\t%s\n  implies \n\t%s\n", left, right);
             }
 
@@ -875,7 +875,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
             right = left.simplifyConstraint(right);
             right = right.orientSubstitution(existentialQuantVars);
             if (right.isTrue() || (right.equalities().isEmpty() && existentialQuantVars.containsAll(right.substitution().keySet()))) {
-                if (global.globalOptions.debug) {
+                if (forceLog || global.globalOptions.debug) {
                     System.err.println("Implication proved by simplification");
                 }
                 continue;
@@ -887,7 +887,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
                 KItem ite = ifThenElseFinder.result.get(0);
                 // TODO (AndreiS): handle KList variables
                 Term condition = ((KList) ite.kList()).get(0);
-                if (global.globalOptions.debug) {
+                if (forceLog || global.globalOptions.debug) {
                     System.err.format("Split on %s\n", condition);
                 }
                 TermContext context = TermContext.builder(global).build();
@@ -901,13 +901,13 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
             ConjunctiveFormula leftWithoutSubst = ConjunctiveFormula.of(ImmutableMapSubstitution.empty(),
                     left.equalities(), left.disjunctions(), left.globalContext());
             global.stateLog.log(StateLog.LogEvent.IMPLICATION, leftWithoutSubst, right);
-            if (!impliesSMT(leftWithoutSubst, right, existentialQuantVars, formulaContext)) {
-                if (global.globalOptions.debug) {
+            if (!impliesSMT(leftWithoutSubst, right, existentialQuantVars, formulaContext, forceLog)) {
+                if (forceLog || global.globalOptions.debug) {
                     System.err.println("Failure!");
                 }
                 return false;
             } else {
-                if (global.globalOptions.debug) {
+                if (forceLog || global.globalOptions.debug) {
                     System.err.println("Proved!");
                 }
             }
@@ -965,7 +965,8 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
             ConjunctiveFormula left,
             ConjunctiveFormula right,
             Set<Variable> existentialQuantVars,
-            FormulaContext formulaContext) {
+            FormulaContext formulaContext,
+            boolean forceLog) {
         impliesStopwatch.start();
         formulaContext.z3Profiler.newRequest();
         try {
@@ -978,7 +979,7 @@ public class ConjunctiveFormula extends Term implements CollectionInternalRepres
             }
             Boolean result = impliesSMTCache.get(triple);
 
-            if (left.globalContext().globalOptions.debugZ3) {
+            if (forceLog || left.globalContext().globalOptions.debugZ3) {
                 formulaContext.printImplication(left, right, result, cached);
             }
             return result;
