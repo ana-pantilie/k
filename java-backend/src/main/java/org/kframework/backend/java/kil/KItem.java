@@ -282,7 +282,7 @@ public class KItem extends Term implements KItemRepresentation {
         global.profiler.resFuncNanoTimer.start();
         Term result;
         try {
-            if (global.globalOptions.cacheFunctions) {
+            if (global.javaExecutionOptions.cacheFunctions) {
                 ConjunctiveFormula constraint = getCacheConstraint(context);
                 result = cacheGet(constraint);
                 if (result == null) {
@@ -308,7 +308,7 @@ public class KItem extends Term implements KItemRepresentation {
         global.profiler.resFuncNanoTimer.start();
         Term result;
         try {
-            if (global.globalOptions.cacheFunctions) {
+            if (global.javaExecutionOptions.cacheFunctions) {
                 ConjunctiveFormula constraint = getCacheConstraint(context);
                 result = cacheGet(constraint);
                 if (result == null) {

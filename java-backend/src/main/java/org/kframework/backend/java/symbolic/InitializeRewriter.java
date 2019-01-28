@@ -231,7 +231,7 @@ public class InitializeRewriter implements Function<Module, Rewriter> {
                         ConstrainedTerm lhs = r.createLhsPattern(termContext);
                         ConstrainedTerm rhs = r.createRhsPattern();
                         termContext.setInitialVariables(lhs.variableSet());
-                        if (rewritingContext.globalOptions.cacheFunctionsOptimized) {
+                        if (rewritingContext.javaExecutionOptions.cacheFunctionsOptimized) {
                             JavaSymbolicObject.clearCache();
                         }
                         return rewriter.proveRule(r, lhs, rhs, allRules, kem);
