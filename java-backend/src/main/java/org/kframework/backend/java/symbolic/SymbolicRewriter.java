@@ -25,10 +25,10 @@ import org.kframework.backend.java.kil.Sort;
 import org.kframework.backend.java.kil.Term;
 import org.kframework.backend.java.kil.TermContext;
 import org.kframework.backend.java.kil.Variable;
-import org.kframework.backend.java.util.StateLog;
 import org.kframework.backend.java.util.FormulaContext;
 import org.kframework.backend.java.util.Profiler2;
 import org.kframework.backend.java.util.RuleSourceUtil;
+import org.kframework.backend.java.util.StateLog;
 import org.kframework.backend.java.utils.BitSet;
 import org.kframework.builtin.KLabels;
 import org.kframework.kore.FindK;
@@ -39,6 +39,7 @@ import org.kframework.kprove.KProve;
 import org.kframework.rewriter.SearchType;
 import org.kframework.utils.errorsystem.KExceptionManager;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -50,7 +51,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.io.File;
 
 /**
  * @author AndreiS
@@ -599,6 +599,7 @@ public class SymbolicRewriter {
         Set<ConstrainedTerm> visited = new HashSet<>();
         List<ConstrainedTerm> queue = new ArrayList<>();
         List<ConstrainedTerm> nextQueue = new ArrayList<>();
+        List<ConstrainedTerm> hist = new ArrayList<>();
 
         KItem initHaltCells = buildHaltCells((KItem) initialTerm.term());
         KItem targetHaltCells = buildHaltCells((KItem) targetTerm.term());
@@ -702,7 +703,7 @@ public class SymbolicRewriter {
                 }*/
 
                 if (guarded) {
-                    ConstrainedTerm result = applySpecRules(term, specRules);
+                    ConstrainedTerm result = applySpecRules(term, specRules, false);
                     if (result != null) {
                         nextStepLogEnabled = true;
                         logStep(step, v, targetCallData, term, true, alreadyLogged);
@@ -713,7 +714,7 @@ public class SymbolicRewriter {
                         if (global.globalOptions.debugSpecRules && !global.globalOptions.debug) {
                             boolean oldDebug2 = global.globalOptions.debug;
                             global.globalOptions.debug = true;
-                            applySpecRules(term, specRules);
+                            applySpecRules(term, specRules, false);
                             global.globalOptions.debug = oldDebug2;
                         }
                         if (visited.add(result)) {
@@ -750,6 +751,7 @@ public class SymbolicRewriter {
                     }
                     /* final term */
                     proofResults.add(term);
+                    hist.add(term);
                 }
 
                 if (results.size() > 1) {
@@ -766,6 +768,7 @@ public class SymbolicRewriter {
                             System.err.println("\nBranching!\n=====================\n");
                         }
                     }
+                    hist.add(term);
                 }
                 for (ConstrainedTerm cterm : results) {
                     ConstrainedTerm result = new ConstrainedTerm(
@@ -778,6 +781,10 @@ public class SymbolicRewriter {
                     if (visited.add(result)) {
                         nextQueue.add(result);
                     }
+                    if (getCell((KItem) result.term(), "<k>").toString().contains("#KSequence(#exec[_]_EVM(CALL"))
+                        hist.add(result);
+                    while (hist.size() > queue.size() * 25)
+                        hist.remove(0);
                 }
                 global.globalOptions.debugZ3 = oldDebug;
                 global.globalOptions.log = oldLog;
@@ -1072,10 +1079,10 @@ public class SymbolicRewriter {
     /**
      * Applies the first applicable specification rule and returns the result.
      */
-    private ConstrainedTerm applySpecRules(ConstrainedTerm constrainedTerm, List<Rule> specRules) {
+    private ConstrainedTerm applySpecRules(ConstrainedTerm constrainedTerm, List<Rule> specRules, boolean forceLog) {
         for (Rule specRule : specRules) {
             ConstrainedTerm pattern = specRule.createLhsPattern(constrainedTerm.termContext());
-            ConjunctiveFormula constraint = constrainedTerm.matchImplies(pattern, true, false, false,
+            ConjunctiveFormula constraint = constrainedTerm.matchImplies(pattern, true, false, forceLog,
                     new FormulaContext(FormulaContext.Kind.SpecRule, specRule), specRule.matchingSymbols());
             if (constraint != null) {
                 ConstrainedTerm result = buildResult(specRule, constraint, null, true, constrainedTerm.termContext(),
