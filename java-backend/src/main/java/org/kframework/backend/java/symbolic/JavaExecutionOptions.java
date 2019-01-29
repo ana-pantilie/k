@@ -47,8 +47,8 @@ public final class JavaExecutionOptions {
     @Parameter(names={"--state-log-events"}, converter=LogEventConverter.class, description="Comma-separated list of events to log: [OPEN|REACHINIT|REACHTARGET|REACHPROVED|NODE|RULE|SRULE|RULEATTEMPT|IMPLICATION|Z3QUERY|Z3RESULT|CLOSE]")
     public List<StateLog.LogEvent> stateLogEvents = Collections.emptyList();
 
-    @Parameter(names="--cache-func", description="Cache evaluation results of pure functions.")
-    public boolean cacheFunctions = false;
+    @Parameter(names="--cache-func", description="Cache evaluation results of pure functions. Enabled by default.", arity = 1)
+    public boolean cacheFunctions = true;
 
     @Parameter(names="--cache-func-optimized",
             description="Clear function cache after initialization phase. Frees some memory. Use IN ADDITION to --cache-func")
