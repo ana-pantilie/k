@@ -625,7 +625,7 @@ public class SymbolicRewriter {
             System.err.println("\nTarget term\n=====================\n");
             printTermAndConstraint(targetTerm, prettyTarget);
         }
-        KItem targetCallData = getCell((KItem) targetTerm.term(), "<callData>");
+        KItem targetCallData = getCell((KItem) targetTerm.term(), "<callData>");.
         int branchingRemaining = global.globalOptions.branchingAllowed;
         boolean nextStepLogEnabled = false;
         while (!queue.isEmpty()) {
@@ -703,7 +703,7 @@ public class SymbolicRewriter {
                 }*/
 
                 if (guarded) {
-                    ConstrainedTerm result = applySpecRules(term, specRules, false);
+                    ConstrainedTerm result = applySpecRules(term, specRules, true);
                     if (result != null) {
                         nextStepLogEnabled = true;
                         logStep(step, v, targetCallData, term, true, alreadyLogged);
@@ -714,7 +714,7 @@ public class SymbolicRewriter {
                         if (global.globalOptions.debugSpecRules && !global.globalOptions.debug) {
                             boolean oldDebug2 = global.globalOptions.debug;
                             global.globalOptions.debug = true;
-                            applySpecRules(term, specRules, false);
+                            applySpecRules(term, specRules, true);
                             global.globalOptions.debug = oldDebug2;
                         }
                         if (visited.add(result)) {
