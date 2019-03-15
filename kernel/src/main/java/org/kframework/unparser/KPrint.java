@@ -192,9 +192,9 @@ public class KPrint {
                 String name = orig.klabel().name();
                 return options.omittedKLabels.contains(name)   ? omitTerm(mod, orig)
                      : options.tokenizedKLabels.contains(name) ? tokenizeTerm(mod, orig)
-                     : options.flattenedKLabels.contains(name) ? flattenTerm(mod, orig)
+                     : options.flattenedKLabels.contains(name) ? super.apply(flattenTerm(mod, orig))
                      : options.tokastKLabels.contains(name)    ? toKASTTerm(mod, orig)
-                     : orig ;
+                     : super.apply(orig) ;
             }
         }.apply(term);
     }
@@ -219,7 +219,7 @@ public class KPrint {
         return KToken(tokenizedTerm, finalSort);
     }
 
-    public static K flattenTerm(Module mod, KApply kapp) {
+    public static KApply flattenTerm(Module mod, KApply kapp) {
         List<K> items = new ArrayList<>();
         Att att = mod.attributesFor().apply(KLabel(kapp.klabel().name()));
         if (att.contains("assoc") && att.contains("unit")) {
